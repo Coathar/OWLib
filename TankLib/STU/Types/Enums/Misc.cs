@@ -3578,7 +3578,7 @@ namespace TankLib.STU.Types.Enums
     [STUEnum(0x9C12ABD8)]
     public enum Enum_9C12ABD8 : int
     {
-        [STUField(0x468B525B)] x468B525B = 0x1C1,
+        [STUField(0x468B525B)] x468B525B = 0x1C0,
     }
 
     [STUEnum(0x9C156357)]
