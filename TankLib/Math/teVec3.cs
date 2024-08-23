@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -52,6 +52,10 @@ namespace TankLib.Math {
 
         public float Length() {
             return (float) System.Math.Sqrt(X * X + Y * Y + Z * Z);
+        }
+
+        public override string ToString() {
+            return $"{X}, {Y}, {Z}";
         }
     }
 }

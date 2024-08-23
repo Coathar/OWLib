@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using DataTool.Flag;
 using TankLib;
 using TankLib.ExportFormats;
@@ -29,11 +29,12 @@ namespace DataTool.SaveLogic {
             public teMapPlaceableData Lights;
             public teMapPlaceableData Sounds;
             public teMapPlaceableData Effects;
+            public teMapPlaceableData Areas;
 
             public OverwatchMap(
                 string name, FindLogic.Combo.ComboInfo info, teMapPlaceableData singleModels,
                 teMapPlaceableData modelGroups, teMapPlaceableData models, teMapPlaceableData entities,
-                teMapPlaceableData lights, teMapPlaceableData sounds, teMapPlaceableData effects) {
+                teMapPlaceableData lights, teMapPlaceableData sounds, teMapPlaceableData effects, teMapPlaceableData areas) {
                 Name = name;
                 Info = info;
 
@@ -44,6 +45,7 @@ namespace DataTool.SaveLogic {
                 Lights = lights ?? new teMapPlaceableData();
                 Sounds = sounds ?? new teMapPlaceableData();
                 Effects = effects ?? new teMapPlaceableData();
+                Areas = areas ?? new teMapPlaceableData();
             }
 
             private string GetModelLookMatPath(FindLogic.Combo.ModelAsset modelInfo, FindLogic.Combo.ModelLookAsset modelLookAsset) {
@@ -310,13 +312,14 @@ namespace DataTool.SaveLogic {
                 teMapPlaceableData placeableSounds = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.SOUND);
                 teMapPlaceableData placeableEffects = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.EFFECT);
                 teMapPlaceableData placeableSequences = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.SEQUENCE);
+                teMapPlaceableData placeableAreas = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.AREA);
 
                 foreach (IMapPlaceable mapPlaceable in placeableSequences.Placeables ?? Array.Empty<IMapPlaceable>()) {
                     teMapPlaceableSequence sequence = (teMapPlaceableSequence)mapPlaceable;
                     FindLogic.Combo.Find(info, sequence.Header.Effect);
                 }
 
-                OverwatchMap exportMap = new OverwatchMap(name, info, placeableSingleModels, placeableModelGroups, placeableModel, placeableEntities, placeableLights, placeableSounds, placeableEffects);
+                OverwatchMap exportMap = new OverwatchMap(name, info, placeableSingleModels, placeableModelGroups, placeableModel, placeableEntities, placeableLights, placeableSounds, placeableEffects, placeableAreas);
                 using (Stream outputStream = File.OpenWrite(Path.Combine(mapPath, $"{variantName}.{exportMap.Extension}"))) {
                     outputStream.SetLength(0);
                     exportMap.Write(outputStream);

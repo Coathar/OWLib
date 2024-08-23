@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -42,6 +42,10 @@ namespace TankLib.Math {
             Y = val[1];
             Z = val[2];
             W = val[3];
+        }
+
+        public override string ToString() {
+            return $"{X}, {Y}, {Z}, {W}";
         }
     }
 }

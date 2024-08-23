@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using static System.Math;
 
@@ -157,6 +157,10 @@ namespace TankLib.Math {
 
         public static implicit operator System.Numerics.Quaternion(teQuat quat) {
             return new System.Numerics.Quaternion(quat.X, quat.Y, quat.Z, quat.W);
+        }
+
+        public override string ToString() {
+            return $"{X}, {Y}, {Z}, {W}";
         }
     }
 }
