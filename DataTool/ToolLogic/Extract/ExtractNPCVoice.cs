@@ -4,7 +4,9 @@ using DataTool.FindLogic;
 using DataTool.Flag;
 using DataTool.Helper;
 using DataTool.JSON;
+using DataTool.SaveLogic.Unlock;
 using TankLib;
+using TankLib.Helpers;
 using TankLib.STU.Types;
 using static DataTool.Helper.STUHelper;
 using static DataTool.Helper.IO;
@@ -33,18 +35,14 @@ namespace DataTool.ToolLogic.Extract {
                     heroVoiceSets.Add(voiceSet);
                     continue;
                 }
-                
+
                 npcHeroVoiceSets.TryAdd(voiceSet, hero.Name);
             }
-            
-            foreach (var skinThemeGUID in Program.TrackedFiles[0xA6]) {
-                var skinTheme = GetInstance<STUSkinBase>(skinThemeGUID);
-                if (skinTheme == null) continue;
-                if (skinTheme.m_runtimeOverrides == null) continue;
 
-                foreach (var runtimeOverride in skinTheme.m_runtimeOverrides) {
-                    var overrideGUID = runtimeOverride.Value.m_3D884507;
-                    
+            foreach (var skinThemeGUID in Program.TrackedFiles[0xA6]) {
+                foreach (var runtimeOverride in SkinTheme.GetReplacements(skinThemeGUID)) {
+                    var overrideGUID = runtimeOverride.Value;
+
                     if (teResourceGUID.Type(overrideGUID) != 0x5F) continue;
                     // this skin overrides a voice set.
                     // its not an npc, dont need it
@@ -54,7 +52,7 @@ namespace DataTool.ToolLogic.Extract {
 
             foreach (var guid in Program.TrackedFiles[0x5F]) {
                 if (heroVoiceSets.Contains(guid)) continue;
-                
+
                 var voiceSet = GetInstance<STUVoiceSet>(guid);
                 if (voiceSet == null) continue;
 

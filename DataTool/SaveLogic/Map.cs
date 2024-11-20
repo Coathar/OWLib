@@ -6,7 +6,7 @@ using TankLib.STU;
 using TankLib.STU.Types;
 using static DataTool.Helper.IO;
 using static DataTool.Helper.STUHelper;
-using static DataTool.Helper.Logger;
+using TankLib.Helpers;
 using System;
 using DataTool.DataModels;
 
@@ -85,7 +85,7 @@ namespace DataTool.SaveLogic {
                                         FindLogic.Combo.Find(Info, graphWithOverrides);
                                     }
                                 }
-                                
+
                                 FindLogic.Combo.Find(Info, statescriptComponentInstanceData.m_2D9815BA);
                             } else if (instanceData is STUModelComponentInstanceData modelComponentInstanceData) {
                                 // (anim)
@@ -250,7 +250,7 @@ namespace DataTool.SaveLogic {
                         var effect = (teMapPlaceableEffect) mapPlaceable;
                         FindLogic.Combo.Find(Info, effect.Header.Effect);
                         // todo: wtf
-                        
+
                         // todo: who did this - zingy
                     }
                 }
@@ -259,7 +259,7 @@ namespace DataTool.SaveLogic {
 
         public static void Save(ICLIFlags flags, MapHeader mapInfo, STUMapHeader mapHeader, ulong key, string basePath) {
             var name = mapInfo.GetName();
-            LoudLog($"Extracting map {name}/{teResourceGUID.Index(key):X}");
+            Logger.Log($"Extracting map {name}/{teResourceGUID.Index(key):X}");
 
             // TODO: MAP11 HAS CHANGED
             // TODO: MAP10 TOO?
@@ -269,7 +269,7 @@ namespace DataTool.SaveLogic {
             CreateDirectoryFromFile(mapPath);
 
             FindLogic.Combo.ComboInfo info = new FindLogic.Combo.ComboInfo();
-            LoudLog("\tFinding");
+            Logger.Log("\tFinding");
             FindLogic.Combo.Find(info, mapHeader.m_map);
 
             for (int i = 0; i < mapHeader.m_D97BC44F.Length; i++) {
@@ -309,6 +309,12 @@ namespace DataTool.SaveLogic {
                 teMapPlaceableData placeableEntities = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.ENTITY);
                 teMapPlaceableData placeableSounds = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.SOUND);
                 teMapPlaceableData placeableEffects = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.EFFECT);
+                teMapPlaceableData placeableSequences = GetPlaceableData(mapHeader, variantGUID, Enums.teMAP_PLACEABLE_TYPE.SEQUENCE);
+
+                foreach (IMapPlaceable mapPlaceable in placeableSequences.Placeables ?? Array.Empty<IMapPlaceable>()) {
+                    teMapPlaceableSequence sequence = (teMapPlaceableSequence)mapPlaceable;
+                    FindLogic.Combo.Find(info, sequence.Header.Effect);
+                }
 
                 OverwatchMap exportMap = new OverwatchMap(name, info, placeableSingleModels, placeableModelGroups, placeableModel, placeableEntities, placeableLights, placeableSounds, placeableEffects);
                 using (Stream outputStream = File.OpenWrite(Path.Combine(mapPath, $"{variantName}.{exportMap.Extension}"))) {
@@ -339,8 +345,8 @@ namespace DataTool.SaveLogic {
                 FindLogic.Combo.Find(info, mapHeader.m_0342E00E?.m_smallMapIcon);
                 FindLogic.Combo.Find(info, mapHeader.m_0342E00E?.m_loadingScreenFlag);
 
-                if (mapHeader.m_supportedGamemodes != null) {
-                    foreach (teResourceGUID gamemodeGUID in mapHeader.m_supportedGamemodes) {
+                if (mapHeader.m_supportedGameModes != null) {
+                    foreach (teResourceGUID gamemodeGUID in mapHeader.m_supportedGameModes) {
                         STUGameMode gameMode = GetInstance<STUGameMode>(gamemodeGUID);
                         if (gameMode == null) continue;
 
@@ -361,7 +367,7 @@ namespace DataTool.SaveLogic {
             FindLogic.Combo.Find(info, mapHeader.m_0342E00E?.m_musicTease);
             info.SetEffectName(mapHeader.m_0342E00E?.m_musicTease, "MusicTease");
 
-            LoudLog("\tSaving");
+            Logger.Log("\tSaving");
             var context = new Combo.SaveContext(info);
             Combo.Save(flags, mapPath, context);
             Combo.SaveLooseTextures(flags, Path.Combine(mapPath, "Textures"), context);
@@ -377,11 +383,11 @@ namespace DataTool.SaveLogic {
             Combo.SaveAllVoiceSets(flags, Path.Combine(mapPath, "VoiceSets"), context);
             Combo.SaveAllSoundFiles(flags, Path.Combine(mapPath, "Sound"), context);
 
-            LoudLog("\tDone");
+            Logger.Log("\tDone");
         }
 
         public static string GetVariantName(STU_71B2D30A variantModeInfo, STU_7FB10A24 variantResultingMap) {
-            var gameMode = GetInstance<STUGameMode>(variantModeInfo.m_gamemode);
+            var gameMode = GetInstance<STUGameMode>(variantModeInfo.m_gameMode);
             var gameModeName = GetCleanString(gameMode?.m_displayName) ?? "Unknown Mode";
             if (gameModeName == "Calypso HeroMode") gameModeName = "HeroMode";
 
@@ -404,10 +410,11 @@ namespace DataTool.SaveLogic {
             }
 
             if (variantModeInfo.m_celebration != 0) {
-                var celebrationName = variantModeInfo.m_celebration.ToString();
-                if (variantModeInfo.m_celebration == 0x04300000000001E9) {
-                    celebrationName = "Winter";
-                }
+                var celebrationName = variantModeInfo.m_celebration.GUID.GUID switch {
+                    0x04300000000001E9 => "Winter",
+                    0x0430000000000254 => "Halloween",
+                    _ => variantModeInfo.m_celebration.ToString()
+                };
                 variantName += $" - {celebrationName}";
             }
 

@@ -21,8 +21,6 @@ using TACTLib.Core.Product.Tank;
 using TACTLib.Exceptions;
 using TankLib.Helpers;
 using ValveKeyValue;
-using static DataTool.Helper.Logger;
-using Logger = TankLib.Helpers.Logger;
 using static DataTool.Helper.SpellCheckUtils;
 
 namespace DataTool {
@@ -33,7 +31,6 @@ namespace DataTool {
         public static ToolFlags Flags;
         public static uint BuildVersion;
         public static bool IsPTR => Client?.ProductCode == "prot";
-        public static bool IsBeta => Client?.ProductCode == "prob";
 
         public static readonly string[] ValidLanguages = { "deDE", "enUS", "esES", "esMX", "frFR", "itIT", "jaJP", "koKR", "plPL", "ptBR", "ruRU", "thTH", "trTR", "zhCN", "zhTW" };
 
@@ -47,7 +44,7 @@ namespace DataTool {
             { "japanese", "jaJP" },
             { "koreana", "koKR" },
             { "polish", "plPL" },
-            { "portuguese", "ptBR" },
+            { "brazilian", "ptBR" },
             { "russian", "ruRU" },
             { "thai", "thTH" },
             { "turkish", "trTR" },
@@ -56,24 +53,18 @@ namespace DataTool {
         };
 
         public static void Main() {
-            InitTankSettings();
             HookConsole();
 
-            var tools = GetTools();
-
-        #if DEBUG
-            FlagParser.CheckCollisions(typeof(ToolFlags), (flag, duplicate) => {
-                Logger.Error("Flag", $"The flag \"{flag}\" from {duplicate} is a duplicate!");
-            });
-        #endif
-
-            FlagParser.LoadArgs();
+            // Verify that tool is being run from the console
+            LaunchHelpers.VerifyConsoleLaunch();
 
             Logger.Info("Core", $"{Assembly.GetExecutingAssembly().GetName().Name} v{Util.GetVersion(typeof(Program).Assembly)}");
-
             Logger.Info("Core", $"CommandLine: [{string.Join(", ", FlagParser.AppArgs.Select(x => $"\"{x}\""))}]");
 
-            Flags = FlagParser.Parse<ToolFlags>(full => PrintHelp(full, tools));
+            var tools = GetTools();
+            InitFlags(tools);
+
+            // If the flags failed to parse or something, just return. Flag parsing will have printed an error.
             if (Flags == null)
                 return;
 
@@ -83,7 +74,7 @@ namespace DataTool {
             }
 
             // todo: this code cant detect e.g `"c:\mypath\" list-heroes` because flags validation fails
-            if (Flags.OverwatchDirectory.EndsWith("\"")) {
+            if (Flags.OverwatchDirectory.Contains("\"")) {
                 Logger.Error("Core", "The Overwatch directory you passed will confuse the tool! Please remove the last \\ character");
                 return;
             }
@@ -100,7 +91,7 @@ namespace DataTool {
                 Flags.OverwatchDirectory = overwatchDirectoryOverride;
             }
 
-            Logger.Info("Core", $"CommandLineFile: {FlagParser.ArgFilePath}");
+            Logger.Debug("Core", $"CommandLineFile: {FlagParser.ArgFilePath}");
 
             if (Flags.SaveArgs) {
                 FlagParser.AppArgs = FlagParser.AppArgs.Where(x => !x.StartsWith("--arg")).ToArray();
@@ -129,7 +120,7 @@ namespace DataTool {
             }
 
             if (targetToolFlags is ExtractFlags extractFlags) {
-                if (extractFlags.OutputPath.EndsWith("\"")) {
+                if (extractFlags.OutputPath.Contains("\"")) {
                     Logger.Error("Core", "The output directory you passed will confuse the tool! Please remove the last \\ character");
                     return;
                 }
@@ -184,7 +175,6 @@ namespace DataTool {
             ShutdownMisc();
         }
 
-
         private static void HookConsole() {
             AppDomain.CurrentDomain.UnhandledException += ExceptionHandler;
             Process.GetCurrentProcess()
@@ -195,8 +185,22 @@ namespace DataTool {
             Console.OutputEncoding = Encoding.UTF8;
         }
 
-        private static void InitTankSettings() {
-            Logger.ShowDebug |= Debugger.IsAttached;
+        private static void InitFlags(HashSet<Type> tools) {
+            FlagParser.LoadArgs();
+
+            Flags = FlagParser.Parse<ToolFlags>(full => PrintHelp(full, tools));
+            if (Flags == null)
+                return;
+
+            if (Flags.Debug) {
+                Logger.ShowDebug = true;
+            }
+
+        #if DEBUG
+            FlagParser.CheckCollisions(typeof(ToolFlags), (flag, duplicate) => {
+                Logger.Error("Flag", $"The flag \"{flag}\" from {duplicate} is a duplicate!");
+            });
+        #endif
         }
 
         public static void InitMisc() {
@@ -289,8 +293,8 @@ namespace DataTool {
                 Logger.Error("Core", "DataTool doesn't support Overwatch versions below 1.14. Please use OverTool.");
             else if (BuildVersion < ProductHandler_Tank.VERSION_152_PTR)
                 Logger.Error("Core", "This version of DataTool doesn't support versions of Overwatch below 1.52. Please use older version of tool.");
-            else if (BuildVersion < 111387)
-                Logger.Error("Core", "This version of DataTool doesn't properly support versions of Overwatch below 2.4. Older version of tool is recommended.");
+            else if (BuildVersion < 121872)
+                Logger.Error("Core", "This version of DataTool doesn't properly support versions of Overwatch below 2.9. Older version of tool is recommended.");
 
             InitTrackedFiles();
         }
@@ -321,11 +325,11 @@ namespace DataTool {
         }
 
         public static void InitKeys() {
-            Logger.Info("Core", "Checking ResourceKeys");
-
             // todo: broken for now..
             // surely fix
-            /*foreach (var key in TrackedFiles[0x90]) {
+            /*Logger.Info("Core", "Checking ResourceKeys");
+
+             foreach (var key in TrackedFiles[0x90]) {
                 if (!ValidKey(key)) continue;
 
                 var resourceKey = GetInstance<STUResourceKey>(key);
@@ -518,10 +522,10 @@ namespace DataTool {
             var tools = new List<Type>(eTools);
             tools.Sort(new ToolComparer());
 
-            Log();
-            Log("Modes:");
-            Log("  {0, -26} | {1, -40}", "mode", "description");
-            Log("".PadLeft(94, '-'));
+            Logger.Log();
+            Logger.Log("Modes:");
+            Logger.Log(null, "  {0, -26} | {1, -40}", "mode", "description");
+            Logger.Log("".PadLeft(94, '-'));
             foreach (var t in tools) {
                 var attribute = t.GetCustomAttribute<ToolAttribute>();
                 if (attribute.IsSensitive) continue;
@@ -529,7 +533,7 @@ namespace DataTool {
                 var desc = attribute.Description;
                 if (attribute.Description == null) desc = "";
 
-                Log("  {0, -26} | {1}", attribute.Keyword, desc);
+                Logger.Log(null, "  {0, -26} | {1}", attribute.Keyword, desc);
             }
 
             var flagTypes = new List<Type>();
@@ -548,8 +552,8 @@ namespace DataTool {
 
             foreach (var flagType in flagTypes) {
                 var flagInfo = flagType.GetCustomAttribute<FlagInfo>();
-                Log();
-                Log($"{flagInfo?.Name ?? flagType.Name} Flags - {flagInfo?.Description ?? ""}");
+                Logger.Log();
+                Logger.Log($"{flagInfo?.Name ?? flagType.Name} Flags - {flagInfo?.Description ?? ""}");
                 typeof(FlagParser).GetMethod(nameof(FlagParser.FullHelp))
                     ?.MakeGenericMethod(flagType)
                     .Invoke(null, new object[] { null, true });

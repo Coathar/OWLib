@@ -8,7 +8,6 @@ using TankLib;
 using TACTLib.Core.Product.Tank;
 using static DataTool.Program;
 using CKey=TACTLib.Core.Key.FullKey;
-using EKey=TACTLib.Core.Key.TruncatedKey;
 
 namespace DataTool.ToolLogic.Extract.Debug {
     [Tool("extract-debug-newents", Description = "Extract new entities (debug)", CustomFlags = typeof(ExtractFlags), IsSensitive = true)]
@@ -28,7 +27,7 @@ namespace DataTool.ToolLogic.Extract.Debug {
 
         public void AddNewByContentHash(Combo.ComboInfo info, HashSet<CKey> contentHashes, params ushort[] types) {
             foreach (KeyValuePair<ulong, ProductHandler_Tank.Asset> asset in TankHandler.m_assets) {
-                TankHandler.UnpackAsset(asset.Value, out var package, out var record);
+                TankHandler.UnpackPackageAsset(asset.Value, out var record);
 
                 ushort fileType = teResourceGUID.Type(asset.Key);
                 if (fileType == 0x9C) continue; // bundle

@@ -5,7 +5,9 @@ using DataTool.DataModels;
 using DataTool.FindLogic;
 using DataTool.Flag;
 using DataTool.Helper;
+using TACTLib.Container;
 using TankLib;
+using TankLib.Helpers;
 using TankLib.STU.Types;
 using static DataTool.Helper.STUHelper;
 using static DataTool.Helper.IO;
@@ -65,14 +67,15 @@ namespace DataTool.ToolLogic.Extract {
                             continue; // no idea what this is
                         }
 
-                        TACTLib.Logger.Debug("Tool", $"Processing skin {unlock.GetName()}");
+                        Logger.Debug("Tool", $"Processing skin {unlock.GetName()}");
                         Combo.ComboInfo info = default;
-                        var skinTheme = GetInstance<STUSkinBase>(unlockSkinTheme.m_skinTheme);
+                        var skinThemeGUID = unlockSkinTheme.m_skinTheme;
+                        var skinTheme = GetInstance<STUSkinBase>(skinThemeGUID);
                         if (skinTheme == null) {
                             continue;
                         }
 
-                        SaveVoiceSet(flags, outputPath, heroName, GetValidFilename(unlock.GetName()), heroVoiceSetGuid, ref info, baseInfo, SkinTheme.GetReplacements(skinTheme));
+                        SaveVoiceSet(flags, outputPath, heroName, GetValidFilename(unlock.GetName()), heroVoiceSetGuid, ref info, baseInfo, SkinTheme.GetReplacements(skinThemeGUID));
                     }
                 }
             }
@@ -87,10 +90,21 @@ namespace DataTool.ToolLogic.Extract {
             var saveContext = new SaveLogic.Combo.SaveContext(info);
             Combo.Find(info, voiceSetGuid.Value, replacements);
 
+            var skinnedVoiceSet = Combo.GetReplacement(voiceSetGuid.Value, replacements);
+            if (!info.m_voiceSets.ContainsKey(skinnedVoiceSet)) {
+                if (Program.Client.ContainerHandler is StaticContainerHandler) {
+                    // (steam)
+                    Logger.Error("ExtractHeroVoice", $"Unable to load voice data {voiceSetGuid:X16}. Did you choose the correct voice locale and is the voice audio depot downloaded?");
+                    return false;
+                }
+                Logger.Error("ExtractHeroVoice", $"Unable to load voice data {voiceSetGuid:X16}");
+                return false;
+            }
+
             // if we're processing a skin, baseCombo is the combo from the hero, this remove duplicate check removes any sounds that belong to the base hero
             // this ensures you only get sounds unique to the skin when processing a skin
             if (baseCombo != null) {
-                if (!Combo.RemoveDuplicateVoiceSetEntries(baseCombo, ref info, voiceSetGuid.Value, Combo.GetReplacement(voiceSetGuid.Value, replacements)))
+                if (!Combo.RemoveDuplicateVoiceSetEntries(baseCombo, ref info, voiceSetGuid.Value, skinnedVoiceSet))
                     return false;
             }
 
@@ -99,9 +113,11 @@ namespace DataTool.ToolLogic.Extract {
 
                 foreach (var voicelineInstanceInfo in voiceSet.Value.VoiceLineInstances) {
                     foreach (var voiceLineInstance in voicelineInstanceInfo.Value) {
-                        if (!voiceLineInstance.SoundFiles.Any()) {
-                            continue;
-                        }
+                        // don't add this back !!
+                        // some hamster lines are non-voice audio only
+                        //if (!voiceLineInstance.SoundFiles.Any()) {
+                        //    continue;
+                        //}
 
                         var stimulus = GetInstance<STUVoiceStimulus>(voiceLineInstance.VoiceStimulus);
                         if (stimulus == null) continue;
@@ -137,7 +153,7 @@ namespace DataTool.ToolLogic.Extract {
                             }
 
                             if (SoundIdCache.Contains(soundFile)) {
-                                TACTLib.Logger.Debug("Tool", "Duplicate sound detected, ignoring.");
+                                Logger.Debug("Tool", "Duplicate sound detected, ignoring.");
                                 continue;
                             }
 

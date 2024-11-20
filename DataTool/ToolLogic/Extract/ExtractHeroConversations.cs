@@ -6,6 +6,7 @@ using DataTool.FindLogic;
 using DataTool.Flag;
 using DataTool.Helper;
 using TankLib;
+using TankLib.Helpers;
 using TankLib.STU.Types;
 using static DataTool.Helper.STUHelper;
 using SkinTheme = DataTool.SaveLogic.Unlock.SkinTheme;
@@ -28,7 +29,7 @@ namespace DataTool.ToolLogic.Extract {
             var validHeroes = Helpers.GetHeroNamesMapping();
             var parsedTypes = ParseQuery(flags, QueryTypes, namesForThisLocale: validHeroes);
             if (parsedTypes == null) {
-                Logger.WarnLog("No query specified, extracting all conversations for all heroes.");
+                Logger.Warn("No query specified, extracting all conversations for all heroes.");
             }
 
             Logger.Log("Generating voiceline mappings, this will take a moment...");
@@ -68,7 +69,7 @@ namespace DataTool.ToolLogic.Extract {
                     continue;
                 }
 
-                Logger.InfoLog($"Extracting {teResourceGUID.AsString(conversationGuid)}");
+                Logger.Info($"Extracting {teResourceGUID.AsString(conversationGuid)}");
 
                 var newPath = basePath;
                 if (flags.VoiceGroupByHero) {
@@ -88,15 +89,16 @@ namespace DataTool.ToolLogic.Extract {
 
                     i++;
                     var (heroName, instance) = VoicelineHeroMapping[voicelineGuid.m_E295B99C];
-                    if (instance.SoundFiles.Count > 1 || instance.SoundFiles.Count == 0) {
-                        continue; // :david: it can happen, i don't know what this means
-                    }
 
-                    var soundFile = instance.SoundFiles.First();
-                    var soundFileGuid = teResourceGUID.AsString(soundFile);
-                    var filename = $"{i}-{heroName ?? "Unknown"}-{soundFileGuid}";
-                    var path = Path.Combine(newPath, teResourceGUID.AsString(conversationGuid));
-                    SaveLogic.Combo.SaveVoiceLineInstance(flags, path, instance, filename);
+                    // todo: hammond could partake in a conversation where he just squeaks in response...
+                    // meaning no voice sound files
+
+                    foreach (var soundFile in instance.SoundFiles) {
+                        var soundFileGuid = teResourceGUID.AsString(soundFile);
+                        var filename = $"{i}-{heroName ?? "Unknown"}-{soundFileGuid}";
+                        var path = Path.Combine(newPath, teResourceGUID.AsString(conversationGuid));
+                        SaveLogic.Combo.SaveVoiceLineInstance(flags, path, instance, filename);
+                    }
                 }
             }
         }
@@ -114,7 +116,7 @@ namespace DataTool.ToolLogic.Extract {
                 var heroStu = hero.STU;
 
                 string heroName = IO.GetValidFilename(hero.Name ?? $"Unknown{teResourceGUID.Index(hero.GUID)}");
-                Logger.InfoLog($"Generating mapping for {heroName}");
+                Logger.Info($"Generating mapping for {heroName}");
 
                 Combo.ComboInfo baseInfo = default;
                 var heroVoiceSetGuid = GetInstance<STUVoiceSetComponent>(heroStu.m_gameplayEntity)?.m_voiceDefinition;
@@ -128,11 +130,12 @@ namespace DataTool.ToolLogic.Extract {
                             continue;
 
                         Combo.ComboInfo info = default;
+                        var skinThemeGUID = unlockSkinTheme.m_skinTheme;
                         var skinTheme = GetInstance<STUSkinBase>(unlockSkinTheme.m_skinTheme);
                         if (skinTheme == null)
                             continue;
 
-                        var replacements = SkinTheme.GetReplacements(skinTheme);
+                        var replacements = SkinTheme.GetReplacements(skinThemeGUID);
                         foreach (var (_, newVoiceSetGuid) in replacements) {
                             seenVoiceSets.Add(newVoiceSetGuid);
                         }

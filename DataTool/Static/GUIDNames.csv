@@ -570,19 +570,16 @@ E89,078,Voicelines,1
 15E9,003,PlayerModel,0
 1611,003,Teacup,0
 1426,003,Biotic Grenade,0
-1425,003,Gameplay1P,0
 15CA,003,Sleep Dart,0
 159C,003,Biotic Rifle,0
 ; D.Va,Classic,47,
 2025,003,MEKA,0
 ; Echo,Classic,47,
-2594,003,Gameplay1P,0
 ; Sigma,Classic,47,
 324F,003,Rock,0
 33EB,003,Rock,0
 18BF,003,Rock,0
 1CC1,003,Barrier,0
-2AB0,003,Gameplay1P,0
 ; Hero Class, Identifiers used by StateScript,,
 850,01C,Tank,1
 851,01C,Support,1
@@ -619,6 +616,12 @@ BB6D,01C,Season4,1
 BD98,01C,Season5,1
 C0C9,01C,Season6,1
 C0CC,01C,Season7,1
+CD75,01C,Season8,1
+CEC0,01C,Season9,1
+D740,01C,Season10,1
+D745,01C,Season11,1
+D748,01C,Season12,1
+D749,01C,Season13,1
 ; Lobby map names,,,
 664,09F,Menu/Hanamura,1
 675,09F,Menu/Gibraltar,1
@@ -645,6 +648,7 @@ D6C,09F,Menu/Toronto,1
 862,09F,Menu/OWL,1
 864,09F,Menu/OWL,1
 8B4,09F,Menu/Rialto (Archives),1
+8BA,09F,Menu/Pink Mercy,1
 8BE,09F,Menu/Rialto,1
 A13,09F,Menu/OWL,1
 A5A,09F,Menu/Chateau (Halloween),1
@@ -653,7 +657,7 @@ AF0,09F,Menu/Paris,1
 B2D,09F,Menu/OWL All Stars (2020),1
 B55,09F,Menu/Havana,1
 B56,09F,Menu/Havana (Archives),1
-BCE,09F,Menu/Summer Games (2020),1
+BCE,09F,Menu/Summer Games Beach,1
 C04,09F,Menu/Eichenwalde (Alt),1
 C46,09F,Menu/Temple of Anubis (Alt),1
 C61,09F,Menu/Black Forest (Winter) (Night),1
@@ -684,8 +688,27 @@ F4A,09F,Menu/Ilios (Junker Queen),1
 1104,09F,Menu/Gothenburg,1
 1111,09F,Menu/Illari,1
 112B,09F,Menu/Malevento,1
-1150,09F,Menu/Hanamura (Hanzo) (Mythic),1
+1150,09F,Menu/Mirrorwatch B,1
 115C,09F,Menu/Blizzard World (Halloween),1
+1173,09F,Menu/LE SSERAFIM,1
+118A,09F,Menu/Samoa,1
+1197,09F,Menu/Black Forest (Orisa Mythic),1
+11AD,09F,Menu/Winter Wonderland (Blizzard World Art),1
+11B4,09F,Menu/Winter Wonderland (Mercy Art),1
+1200,09F,Menu/Moira Mythic,1
+1219,09F,Menu/Porsche Art,1
+121A,09F,Menu/Venture,1
+121E,09F,Menu/Mirrorwatch A,1
+123F,09F,Menu/Ultrawatch Art A,1
+1243,09F,Menu/Transformers Art,1
+1249,09F,Menu/Lifeguard Art,1
+124A,09F,Menu/Reinhardt Bound Demon Mythic Weapon,1
+1276,09F,Menu/Juno Art,1
+1277,09F,Menu/Reaper Mythic Art,1
+1289,09F,Menu/Ana Midnight Sun Mythic Weapon,1
+1293,09F,Menu/WoW Art,1
+12A4,09F,Menu/MHA Art,1
+12A5,09F,Menu/Spellbinder Art,1
 ; Celebrations,,,
 2168,01C,Christmas,1
 2498,01C,LunarNewYear,1

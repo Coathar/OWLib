@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using SharpDX;
+using System.Numerics;
 using TankLib.Chunks;
 using TankLib.Helpers;
 using TankLib.Math;
@@ -30,23 +30,25 @@ namespace TankLib.ExportFormats {
         public string ModelLookFileName;
         public string Name;
         public ulong GUID;
+        public bool AllLODs;
 
-        public readonly StreamingLodsInfo m_streamedLods;
+        public readonly IReadOnlyList<StreamingLodsInfo> StreamedLods;
 
-        public OverwatchModel(teChunkedData chunkedData, ulong guid, string name, StreamingLodsInfo streamedLods=null) {
+        public OverwatchModel(teChunkedData chunkedData, ulong guid, string name, bool allLods=false, IReadOnlyList<StreamingLodsInfo> streamedLods=null) {
             _data = chunkedData;
-            GUID = guid;
             Name = name;
-            m_streamedLods = streamedLods;
+            GUID = guid;
+            AllLODs = allLods;
+            StreamedLods = streamedLods;
         }
 
-        private struct TempSubmesh {
+        private struct LoadedSubmesh {
             public readonly teModelChunk_RenderMesh.Submesh m_submesh;
-            public readonly ulong m_material;
+            public readonly ulong m_materialID;
 
-            public TempSubmesh(teModelChunk_RenderMesh.Submesh submesh, teModelChunk_Model srcModel) {
+            public LoadedSubmesh(teModelChunk_RenderMesh.Submesh submesh, teModelChunk_Model srcModel) {
                 m_submesh = submesh;
-                m_material = srcModel.Materials[submesh.Descriptor.Material];
+                m_materialID = srcModel.Materials[submesh.Descriptor.Material];
             }
         }
 
@@ -56,20 +58,19 @@ namespace TankLib.ExportFormats {
             teModelChunk_Cloth cloth = _data.GetChunk<teModelChunk_Cloth>();
             teModelChunk_STU stu = _data.GetChunk<teModelChunk_STU>();
 
-            var allSubmeshes = new List<TempSubmesh>();
+            var allSubmeshes = new List<LoadedSubmesh>();
             if (renderMesh?.Submeshes != null) {
                 var model = _data.GetChunk<teModelChunk_Model>();
-                allSubmeshes.AddRange(renderMesh.Submeshes.Select(x => new TempSubmesh(x, model)));
+                allSubmeshes.AddRange(renderMesh.Submeshes.Select(x => new LoadedSubmesh(x, model)));
             }
-            if (m_streamedLods?.m_renderMesh != null) {
-                // todo: can multiple stream payloads be required? and therefore we miss meshes again?
-                // i wasn't paying attention in class
-                 
-                // todo: also turns out this wasn't needed for necromancer, which is why i write this code. (instead lod was equality instead of bitflag)
-                // but i guess its useful if we wanted to add lod models back
-                 
-                var streamedModel = m_streamedLods.m_model;
-                allSubmeshes.AddRange(m_streamedLods.m_renderMesh.Submeshes.Select(x => new TempSubmesh(x, streamedModel)));
+
+            foreach (var streamingLodsInfo in StreamedLods) {
+                if (streamingLodsInfo?.m_renderMesh == null) {
+                    continue;
+                }
+                
+                var streamedModel = streamingLodsInfo.m_model;
+                allSubmeshes.AddRange(streamingLodsInfo.m_renderMesh.Submeshes.Select(x => new LoadedSubmesh(x, streamedModel)));
             }
 
             using (BinaryWriter writer = new BinaryWriter(stream)) {
@@ -93,13 +94,17 @@ namespace TankLib.ExportFormats {
                     highestLOD = submeshesWithLod.Min(x => x.m_submesh.Descriptor.LOD);
                 }
 
-                TempSubmesh[] submeshesToWrite = allSubmeshes.Where(x => (x.m_submesh.Descriptor.LOD & highestLOD) != 0 || x.m_submesh.Descriptor.LOD == -1).ToArray();
+                Func<LoadedSubmesh, bool> submeshFilter = x => (x.m_submesh.Descriptor.LOD & highestLOD) != 0 || x.m_submesh.Descriptor.LOD == -1;
+                if (AllLODs) {
+                    submeshFilter = x => true;
+                }
+                LoadedSubmesh[] submeshesToWrite = allSubmeshes.Where(submeshFilter).ToArray();
 
                 short[] hierarchy = null;
-                Dictionary<int, teModelChunk_Cloth.ClothNode> clothNodeMap = null;
+                HashSet<short> reparentedBones = null;
                 if (skeleton != null) {
                     if (cloth != null) {
-                        hierarchy = cloth.CreateFakeHierarchy(skeleton, out clothNodeMap);
+                        hierarchy = cloth.CreateFakeHierarchy(skeleton, out reparentedBones);
                     } else {
                         hierarchy = skeleton.Hierarchy;
                     }
@@ -118,13 +123,13 @@ namespace TankLib.ExportFormats {
                 }
 
                 if (skeleton != null) {
-                    //Console.Out.WriteLine($"SKELETON {GUID:X16} {skeleton.Header.BonesAbs} {skeleton.Header.BonesSimple} {skeleton.Header.BonesCloth} {skeleton.Header.RemapCount} {skeleton.Header.IDCount}");
-                    for (int i = 0; i < skeleton.Header.BonesAbs; ++i) { // todo: CLOTH BONES WHERE GONE.
+                    for (int i = 0; i < skeleton.Header.BonesAbs; ++i) {
+                        // pass negative id: cloth bone
                         writer.Write(IdToString("bone", i >= skeleton.IDs.Length ? (long) -i : skeleton.IDs[i]));
                         short parent = hierarchy[i];
                         writer.Write(parent);
 
-                        GetRefPoseTransform(i, hierarchy, skeleton, clothNodeMap, out teVec3 scale, out teQuat quat, out teVec3 translation);
+                        GetRefPoseTransform(i, hierarchy, skeleton, reparentedBones, out teVec3 scale, out teQuat quat, out teVec3 translation);
                         writer.Write(translation);
                         writer.Write(scale);
                         writer.Write(quat.ToEulerAngles());
@@ -132,11 +137,16 @@ namespace TankLib.ExportFormats {
                 }
 
                 int submeshIdx = 0;
-                foreach (TempSubmesh submeshA in submeshesToWrite) {
-                    var submesh = submeshA.m_submesh;
+                foreach (LoadedSubmesh loadedSubmesh in submeshesToWrite) {
+                    var submesh = loadedSubmesh.m_submesh;
+
+                    var submeshName = $"Submesh_{submeshIdx}.{loadedSubmesh.m_materialID:X16}";
+                    if (AllLODs && loadedSubmesh.m_submesh.Descriptor.LOD != -1) {
+                        submeshName += $" (LOD: {BitOperations.Log2((byte)loadedSubmesh.m_submesh.Descriptor.LOD)})";
+                    }
                     
-                    writer.Write($"Submesh_{submeshIdx}.{submeshA.m_material:X16}");
-                    writer.Write(submeshA.m_material);
+                    writer.Write(submeshName);
+                    writer.Write(loadedSubmesh.m_materialID);
                     writer.Write(submesh.UVCount);
 
                     writer.Write(submesh.Vertices.Length);
@@ -223,11 +233,11 @@ namespace TankLib.ExportFormats {
 
 
                 if (stu?.StructuredData.m_hardPoints != null) {
-                    foreach (STUModelHardpoint hardPoint in stu.StructuredData.m_hardPoints) {
+                    foreach (STUModelHardPoint hardPoint in stu.StructuredData.m_hardPoints) {
                         writer.Write(IdToString("hardpoint", teResourceGUID.Index(hardPoint.m_EDF0511C)));
                         writer.Write(IdToString("bone", teResourceGUID.Index(hardPoint.m_FF592924)));
 
-                        Matrix parentMat = Matrix.Identity;
+                        Matrix4x4 parentMat = Matrix4x4.Identity;
                         if (hardPoint.m_FF592924 != 0 && skeleton != null) {
                             int? boneIdx = null;
                             var hardPointBoneID = teResourceGUID.Index(hardPoint.m_FF592924);
@@ -240,7 +250,7 @@ namespace TankLib.ExportFormats {
                             }
 
                             if (boneIdx == null) {
-                                parentMat = Matrix.Identity;
+                                parentMat = Matrix4x4.Identity;
                                 Logger.Debug("OverwatchModel",
                                              $"Hardpoint {teResourceGUID.AsString(hardPoint.m_EDF0511C)} is attached to bone {teResourceGUID.AsString(hardPoint.m_FF592924)} which doesn't exist on model {teResourceGUID.AsString(GUID)}");
                             } else {
@@ -248,38 +258,41 @@ namespace TankLib.ExportFormats {
                             }
                         }
 
-                        Matrix hardPointMat = Matrix.RotationQuaternion(hardPoint.m_rotation) *
-                                              Matrix.Translation(hardPoint.m_position);
+                        Matrix4x4 hardPointMat = Matrix4x4.CreateFromQuaternion(hardPoint.m_rotation) *
+                                                 Matrix4x4.CreateTranslation(hardPoint.m_position);
 
-                        hardPointMat = hardPointMat * parentMat;
-                        hardPointMat.Decompose(out Vector3 _, out Quaternion rot, out Vector3 pos);
+                        hardPointMat *= parentMat;
+                        Matrix4x4.Decompose(hardPointMat, out _, out var worldOri, out var worldTranslation);
 
-                        writer.Write(pos);
-                        writer.Write(rot);
+                        writer.Write(worldTranslation);
+                        writer.Write(worldOri);
                     }
                 }
             }
         }
 
-        public static void GetRefPoseTransform(int i, short[] hierarchy, teModelChunk_Skeleton skeleton, Dictionary<int, teModelChunk_Cloth.ClothNode> clothNodeMap, out teVec3 scale, out teQuat quat,
+        public static void GetRefPoseTransform(int i, short[] hierarchy, teModelChunk_Skeleton skeleton, HashSet<short> reparentedBones, out teVec3 scale, out teQuat quat,
             out teVec3 translation) {
-            if (clothNodeMap != null && clothNodeMap.ContainsKey(i)) {
-                Matrix thisMat = skeleton.GetWorldSpace(i);
-                Matrix parentMat = skeleton.GetWorldSpace(hierarchy[i]);
+            if (reparentedBones != null && reparentedBones.Contains((short)i)) {
+                // re-parent to the new parent the cloth system has given us
+                
+                Matrix4x4 thisMat = skeleton.GetWorldSpace(i);
+                Matrix4x4 parentMat = skeleton.GetWorldSpace(hierarchy[i]);
 
-                Matrix newParentMat = thisMat * Matrix.Invert(parentMat);
+                Matrix4x4.Invert(parentMat, out var invParentMat);
+                Matrix4x4 newParentMat = thisMat * invParentMat;
 
-                newParentMat.Decompose(out Vector3 scl2, out Quaternion rot2, out Vector3 pos2);
+                Matrix4x4.Decompose(newParentMat, out var scl2, out var rot2, out var pos2);
 
                 quat = new teQuat(rot2.X, rot2.Y, rot2.Z, rot2.W);
                 scale = new teVec3(scl2.X, scl2.Y, scl2.Z);
                 translation = new teVec3(pos2.X, pos2.Y, pos2.Z);
             } else {
-                teMtx43 bone = skeleton.Matrices34Inverted[i];
+                var bone = skeleton.BindPoseDeltas[i];
 
-                scale = new teVec3(bone[1, 0], bone[1, 1], bone[1, 2]);
-                quat = new teQuat(bone[0, 0], bone[0, 1], bone[0, 2], bone[0, 3]);
-                translation = new teVec3(bone[2, 0], bone[2, 1], bone[2, 2]);
+                scale = bone.Scale;
+                quat = bone.Orientation;
+                translation = bone.Translation;
             }
         }
 
