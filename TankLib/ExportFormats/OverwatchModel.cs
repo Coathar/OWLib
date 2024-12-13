@@ -101,10 +101,10 @@ namespace TankLib.ExportFormats {
                 LoadedSubmesh[] submeshesToWrite = allSubmeshes.Where(submeshFilter).ToArray();
 
                 short[] hierarchy = null;
-                Dictionary<int, teModelChunk_Cloth.ClothNode> clothNodeMap = null;
+                HashSet<short> reparentedBones = null;
                 if (skeleton != null) {
                     if (cloth != null) {
-                        hierarchy = cloth.CreateFakeHierarchy(skeleton, out clothNodeMap);
+                        hierarchy = cloth.CreateFakeHierarchy(skeleton, out reparentedBones);
                     } else {
                         hierarchy = skeleton.Hierarchy;
                     }
@@ -123,13 +123,13 @@ namespace TankLib.ExportFormats {
                 }
 
                 if (skeleton != null) {
-                    //Console.Out.WriteLine($"SKELETON {GUID:X16} {skeleton.Header.BonesAbs} {skeleton.Header.BonesSimple} {skeleton.Header.BonesCloth} {skeleton.Header.RemapCount} {skeleton.Header.IDCount}");
-                    for (int i = 0; i < skeleton.Header.BonesAbs; ++i) { // todo: CLOTH BONES WHERE GONE.
+                    for (int i = 0; i < skeleton.Header.BonesAbs; ++i) {
+                        // pass negative id: cloth bone
                         writer.Write(IdToString("bone", i >= skeleton.IDs.Length ? (long) -i : skeleton.IDs[i]));
                         short parent = hierarchy[i];
                         writer.Write(parent);
 
-                        GetRefPoseTransform(i, hierarchy, skeleton, clothNodeMap, out teVec3 scale, out teQuat quat, out teVec3 translation);
+                        GetRefPoseTransform(i, hierarchy, skeleton, reparentedBones, out teVec3 scale, out teQuat quat, out teVec3 translation);
                         writer.Write(translation);
                         writer.Write(scale);
                         writer.Write(quat.ToEulerAngles());
@@ -233,7 +233,7 @@ namespace TankLib.ExportFormats {
 
 
                 if (stu?.StructuredData.m_hardPoints != null) {
-                    foreach (STUModelHardpoint hardPoint in stu.StructuredData.m_hardPoints) {
+                    foreach (STUModelHardPoint hardPoint in stu.StructuredData.m_hardPoints) {
                         writer.Write(IdToString("hardpoint", teResourceGUID.Index(hardPoint.m_EDF0511C)));
                         writer.Write(IdToString("bone", teResourceGUID.Index(hardPoint.m_FF592924)));
 
@@ -271,9 +271,9 @@ namespace TankLib.ExportFormats {
             }
         }
 
-        public static void GetRefPoseTransform(int i, short[] hierarchy, teModelChunk_Skeleton skeleton, Dictionary<int, teModelChunk_Cloth.ClothNode> clothNodeMap, out teVec3 scale, out teQuat quat,
+        public static void GetRefPoseTransform(int i, short[] hierarchy, teModelChunk_Skeleton skeleton, HashSet<short> reparentedBones, out teVec3 scale, out teQuat quat,
             out teVec3 translation) {
-            if (clothNodeMap != null && clothNodeMap.ContainsKey(i)) {
+            if (reparentedBones != null && reparentedBones.Contains((short)i)) {
                 // re-parent to the new parent the cloth system has given us
                 
                 Matrix4x4 thisMat = skeleton.GetWorldSpace(i);

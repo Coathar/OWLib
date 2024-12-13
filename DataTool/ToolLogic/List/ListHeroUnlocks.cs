@@ -4,7 +4,6 @@ using DataTool.DataModels;
 using DataTool.Flag;
 using DataTool.Helper;
 using DataTool.JSON;
-using static DataTool.Helper.Logger;
 
 namespace DataTool.ToolLogic.List {
     [Tool("list-unlocks", Description = "List hero unlocks", CustomFlags = typeof(ListFlags))]
@@ -77,7 +76,10 @@ namespace DataTool.ToolLogic.List {
             var @return = new Dictionary<string, ProgressionUnlocks>();
             var heroes = Helpers.GetHeroes();
             foreach (var (heroGuid, hero) in heroes) {
-                if (string.IsNullOrEmpty(hero.Name)) continue;
+                if (!hero.IsHero || string.IsNullOrEmpty(hero.Name)) {
+                    continue;
+                }
+
                 @return[hero.Name] = new ProgressionUnlocks(hero.STU);
             }
 

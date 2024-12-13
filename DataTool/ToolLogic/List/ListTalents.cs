@@ -1,14 +1,13 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using DataTool.DataModels.Hero;
 using DataTool.Flag;
 using DataTool.Helper;
 using DataTool.JSON;
 using TankLib;
-using static DataTool.Program;
 
 namespace DataTool.ToolLogic.List {
-    [Tool("list-abilities", Description = "List abilities", CustomFlags = typeof(ListFlags))]
-    public class ListAbilities : JSONTool, ITool {
+    [Tool("list-talents", Description = "List talents", CustomFlags = typeof(ListFlags))]
+    public class ListTalents : JSONTool, ITool {
         public void Parse(ICLIFlags toolFlags) {
             var flags = (ListFlags) toolFlags;
             var data = GetData();
@@ -22,24 +21,23 @@ namespace DataTool.ToolLogic.List {
             foreach (var loadout in data) {
                 Log($"{indentLevel}{loadout.Value.Name}:");
                 if (!flags.Simplify) {
-                    Log($"{indentLevel + 1}       Type: {loadout.Value.Category}");
-                    Log($"{indentLevel + 1}     Button: {loadout.Value.Button ?? "None"}");
                     Log($"{indentLevel + 1}Description: {loadout.Value.Description}");
                     Log();
                 }
             }
         }
 
-        private Dictionary<teResourceGUID, Loadout> GetData() {
-            var @return = new Dictionary<teResourceGUID, Loadout>();
+        public static Dictionary<teResourceGUID, Talent> GetData() {
+            var map = new Dictionary<teResourceGUID, Talent>();
 
-            foreach (teResourceGUID key in TrackedFiles[0x9E]) {
-                var loadout = new Loadout(key);
-                if (loadout.GUID == 0) continue;
-                @return.Add(key, loadout);
+            foreach (teResourceGUID key in Program.TrackedFiles[0x134]) {
+                var talent = new Talent(key);
+                if (talent.GUID == 0) continue;
+                if (talent.Name == null) continue;
+                map.Add(key, talent);
             }
 
-            return @return;
+            return map;
         }
     }
 }

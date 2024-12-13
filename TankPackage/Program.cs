@@ -9,7 +9,7 @@ using DataTool.Flag;
 using DataTool.ToolLogic.Extract;
 using static DataTool.Program;
 using static DataTool.Helper.IO;
-using static DataTool.Helper.Logger;
+using TankLib.Helpers;
 using System.Threading.Tasks;
 using TankLib;
 using TACTLib.Core.Product.Tank;
@@ -29,11 +29,11 @@ namespace TankPackage
                 return;
             }
             var f = Flags;
-            
+
             InitStorage();
             InitMisc();
             InitKeys();
-            
+
             string[] modeArgs = Flags.Positionals.Skip(2).ToArray();
 
             switch (Flags.Mode.ToLower())
@@ -179,7 +179,7 @@ namespace TankPackage
                     }
 
                     tmp = Path.Combine(tmp, teResourceGUID.AsString(record.m_GUID));
-                    InfoLog("Saved {0}", tmp);
+                    Logger.Info(null, "Saved {0}", tmp);
                     WriteFile(file, tmp);
                 }
             }
@@ -198,7 +198,7 @@ namespace TankPackage
                     }
 
                     tmp = Path.Combine(tmp, teResourceGUID.AsString(guid));
-                    InfoLog("Saved {0}", tmp);
+                    Logger.Info("TankPackage", "Saved {0}", tmp);
                     WriteFile(file, tmp);
                 }
             }
@@ -218,7 +218,7 @@ namespace TankPackage
 
                 foreach (PackageRecord record in records.Where(x => guids.Contains(x.m_GUID) || guids.Contains(teResourceGUID.Type(x.m_GUID)) || guids.Contains(teResourceGUID.Index(x.m_GUID)) || guids.Contains(teResourceGUID.LongKey(x.m_GUID))))
                 {
-                    Log("Found {0} in package {1:X12}", teResourceGUID.AsString(record.m_GUID), teResourceGUID.LongKey(entry.m_packageGUID));
+                    Logger.Info(null, "Found {0} in package {1:X12}", teResourceGUID.AsString(record.m_GUID), teResourceGUID.LongKey(entry.m_packageGUID));
                 }
             }
         }
@@ -235,7 +235,7 @@ namespace TankPackage
 
                 foreach (PackageRecord record in records.Where(x => guids.Contains(teResourceGUID.Type(x.m_GUID))))
                 {
-                    Log("Found {0} in package {1:X12}", teResourceGUID.AsString(record.m_GUID), teResourceGUID.LongKey(entry.m_packageGUID));
+                    Logger.Info(null, "Found {0} in package {1:X12}", teResourceGUID.AsString(record.m_GUID), teResourceGUID.LongKey(entry.m_packageGUID));
                 }
             }
         }
@@ -249,9 +249,9 @@ namespace TankPackage
             {
                 PackageEntry entry = apm.m_packageEntries[i];
                 if (!guids.Contains(teResourceGUID.LongKey(entry.m_packageGUID)) && !guids.Contains(teResourceGUID.Index(entry.m_packageGUID))) continue;
-                Log("Package {0:X12}:", teResourceGUID.LongKey(entry.m_packageGUID));
-                Log("\tUnknowns: {0}, {1}", entry.m_unknown1, entry.m_unknown2);
-                Log("\t{0} records", apm.m_packageRecords[i].Length);
+                Logger.Info(null, "Package {0:X12}:", teResourceGUID.LongKey(entry.m_packageGUID));
+                Logger.Info(null, "\tUnknowns: {0}, {1}", entry.m_unknown1, entry.m_unknown2);
+                Logger.Info(null, "\t{0} records", apm.m_packageRecords[i].Length);
             }
         }
     }

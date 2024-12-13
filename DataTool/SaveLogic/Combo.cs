@@ -6,7 +6,6 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
-using System.Threading;
 using DataTool.ConvertLogic;
 using DataTool.ConvertLogic.WEM;
 using DataTool.Flag;
@@ -28,11 +27,10 @@ namespace DataTool.SaveLogic {
     public static class Combo {
         public static ScratchDB ScratchDBInstance = new ScratchDB();
 
-        private static SemaphoreSlim s_texurePrepareSemaphore = new SemaphoreSlim(100, 100); // don't load too many texures into memory
-
         public class SaveContext {
             public FindLogic.Combo.ComboInfo m_info;
             public bool m_saveAnimationEffects = true;
+            public bool m_saveAnimationEffectsAsLoose;
 
             public SaveContext(FindLogic.Combo.ComboInfo info) {
                 m_info = info;
@@ -49,7 +47,13 @@ namespace DataTool.SaveLogic {
             }
 
             foreach (FindLogic.Combo.EffectInfoCombo effectInfo in context.m_info.m_effects.Values) {
-                SaveEffect(flags, path, context, effectInfo.m_GUID);
+                SaveEffect(flags, path, context, effectInfo);
+            }
+
+            if (context.m_saveAnimationEffectsAsLoose) {
+                foreach (FindLogic.Combo.EffectInfoCombo animationEffectInfo in context.m_info.m_animationEffects.Values) {
+                    SaveEffect(flags, path, context, animationEffectInfo);
+                }
             }
         }
 
@@ -172,7 +176,7 @@ namespace DataTool.SaveLogic {
                 priority = parsedAnimation.Header.Priority;
                 group = parsedAnimation.Header.Group;
             } catch (Exception) {
-                Logger.Error("Combo", $"Unable to parse animation {animationInfo.GetName()}");
+                Logger.Warn("Combo", $"Unable to parse animation {animationInfo.GetName()}");
             }
 
             string animationDirectory = Path.Combine(path, "Animations", priority.ToString(), group.ToString());
@@ -340,7 +344,10 @@ namespace DataTool.SaveLogic {
         }
 
         public static void SaveEffect(ICLIFlags flags, string path, SaveContext context, ulong effect) {
-            FindLogic.Combo.EffectInfoCombo effectInfo = context.m_info.m_effects[effect];
+            SaveEffect(flags, path, context, context.m_info.m_effects[effect]);
+        }
+
+        private static void SaveEffect(ICLIFlags flags, string path, SaveContext context, FindLogic.Combo.EffectInfoCombo effectInfo) {
             string effectDirectory = Path.Combine(path, "Effects", effectInfo.GetName());
 
             SaveEffectExtras(flags, effectDirectory, context, effectInfo.Effect, out Dictionary<ulong, HashSet<FindLogic.Combo.VoiceLineInstanceInfo>> svceLines);
@@ -395,7 +402,7 @@ namespace DataTool.SaveLogic {
                         teChunkedData streamingLodChunks = new teChunkedData(streamingLodStream);
                         return new StreamingLodsInfo(streamingLodChunks);
                     }
-                    
+
                     // do we need to load every streaming payload? i don't know (how many models have >1? might be 0)
                     // but, it is used for AllLODs support
 
@@ -641,7 +648,7 @@ namespace DataTool.SaveLogic {
         }
 
         private static void ProcessIconTexture(teTexture texture, string filePath, string convertType) {
-            var converted = new TexDecoder(texture);
+            var converted = new TexDecoder(texture, false);
 
             using Image<Bgra32> alphaImage = converted.GetFrame(0);
             using Image<Bgra32> colorImage = converted.GetFrame(1);
@@ -706,6 +713,7 @@ namespace DataTool.SaveLogic {
             var splitMultiSurface = false;
             var maxMips = 1;
             var useTextureDecoder = !OperatingSystem.IsWindows();
+            var grayscale = false;
 
             if (flags is ExtractFlags extractFlags) {
                 if (extractFlags.SkipTextures) return;
@@ -714,6 +722,7 @@ namespace DataTool.SaveLogic {
                 splitMultiSurface = (split || !extractFlags.CombineMultiSurface) && convertTextures && !createMultiSurfaceSheet;
                 convertType = fileType ?? extractFlags.ConvertTexturesType.ToLowerInvariant();
                 useTextureDecoder = extractFlags.UseTextureDecoder || useTextureDecoder;
+                grayscale = extractFlags.Grayscale;
 
                 if (extractFlags.ForceDDSMultiSurface) {
                     multiSurfaceConvertType = "dds";
@@ -796,7 +805,7 @@ namespace DataTool.SaveLogic {
 
                     if (useTextureDecoder) {
                         try {
-                            ConvertTexture(texture, splitMultiSurface, createMultiSurfaceSheet, filePath, convertType);
+                            ConvertTexture(texture, splitMultiSurface, createMultiSurfaceSheet, grayscale, filePath, convertType);
                             return;
                         } catch(Exception e) {
                             Logger.Warn("Combo", $"Failed to convert {Path.GetFileName(filePath)} using the texture decoder: {e.Message}");
@@ -815,8 +824,8 @@ namespace DataTool.SaveLogic {
             }
         }
 
-        private static void ConvertTexture(teTexture texture, bool splitMultiSurface, bool createMultiSurfaceSheet, string filePath, string convertType) {
-            var tex = new TexDecoder(texture);
+        private static void ConvertTexture(teTexture texture, bool splitMultiSurface, bool createMultiSurfaceSheet, bool grayscale, string filePath, string convertType) {
+            var tex = new TexDecoder(texture, grayscale);
 
             if (splitMultiSurface) {
                 for (var surfaceNr = 0; surfaceNr < tex.Surfaces; ++surfaceNr) {
